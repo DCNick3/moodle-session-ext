@@ -10,10 +10,10 @@ use tracing_subscriber::util::SubscriberInitExt;
 pub mod config;
 pub mod db;
 pub mod model;
+pub mod moodle;
 
-// #[tokio::main]
-// async
-fn main() -> Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_span_events(FmtSpan::ENTER | FmtSpan::EXIT))
         .with(tracing_subscriber::filter::EnvFilter::from_default_env())
@@ -36,6 +36,8 @@ fn main() -> Result<()> {
     db.add_token(&email, "MOODLE2".to_string())?;
     db.add_token(&email, "MOODLE3".to_string())?;
     db.add_token(&email, "MOODLE4".to_string())?;
+
+    println!("{}", db.dump()?);
 
     Ok(())
 }

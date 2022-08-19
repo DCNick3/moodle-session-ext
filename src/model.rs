@@ -1,13 +1,21 @@
 use kv::{Error, Raw};
 use serde::{Deserialize, Serialize};
+use std::fmt::{Debug, Formatter};
 use std::ops::Add;
 use std::time::{Duration, SystemTime};
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+#[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct TokenId([u8; 8]);
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Email(pub String);
+
+impl Debug for TokenId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let id: u64 = (*self).into();
+        write!(f, "TokenId({})", id)
+    }
+}
 
 impl AsRef<[u8]> for TokenId {
     fn as_ref(&self) -> &[u8] {
@@ -24,6 +32,11 @@ impl<'a> kv::Key<'a> for TokenId {
 impl From<u64> for TokenId {
     fn from(v: u64) -> Self {
         Self(v.to_be_bytes())
+    }
+}
+impl From<TokenId> for u64 {
+    fn from(t: TokenId) -> Self {
+        u64::from_be_bytes(t.0)
     }
 }
 
@@ -54,8 +67,16 @@ macro_rules! impl_value {
     };
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct UpdateQueueKey([u8; 16]);
+
+impl Debug for UpdateQueueKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let (t, k): (SystemTime, TokenId) = (*self).into();
+
+        f.debug_tuple("UpdateQueueKey").field(&t).field(&k).finish()
+    }
+}
 
 impl AsRef<[u8]> for UpdateQueueKey {
     fn as_ref(&self) -> &[u8] {
@@ -104,14 +125,14 @@ impl From<UpdateQueueKey> for (SystemTime, TokenId) {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct User {
     pub email: Email,
     pub tokens: Vec<TokenId>,
 }
 impl_value!(User);
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Token {
     pub owner: Email,
     pub moodle_session: String,
@@ -123,7 +144,7 @@ pub struct Token {
 }
 impl_value!(Token);
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct UpdateQueueItem {
     pub token: TokenId,
 }

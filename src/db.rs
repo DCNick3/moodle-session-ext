@@ -2,6 +2,7 @@ use crate::config;
 use crate::model::{Email, Token, TokenId, UpdateQueueItem, UpdateQueueKey, User};
 use anyhow::Result;
 use kv::TransactionError;
+use std::fmt::Write;
 use std::result;
 use std::time::SystemTime;
 use tracing::{debug, info, instrument, warn};
@@ -127,5 +128,42 @@ impl Database {
         )?;
 
         Ok(())
+    }
+
+    pub fn dump(&self) -> Result<String> {
+        let mut res = String::new();
+
+        writeln!(res, "Users:")?;
+        for it in self.users.iter() {
+            let it = it?;
+            writeln!(res, "{:?} -> {:?}", it.key::<Email>()?, it.value::<User>()?)?;
+        }
+        writeln!(res, "\n======")?;
+
+        writeln!(res, "Tokens:")?;
+        for it in self.tokens.iter() {
+            let it = it?;
+            writeln!(
+                res,
+                "{:?} -> {:?}",
+                it.key::<TokenId>()?,
+                it.value::<Token>()?
+            )?;
+        }
+        writeln!(res, "\n======")?;
+
+        writeln!(res, "Update Queue:")?;
+        for it in self.update_queue.iter() {
+            let it = it?;
+            writeln!(
+                res,
+                "{:?} -> {:?}",
+                it.key::<UpdateQueueKey>()?,
+                it.value::<UpdateQueueItem>()?
+            )?;
+        }
+        writeln!(res, "\n======")?;
+
+        Ok(res)
     }
 }
