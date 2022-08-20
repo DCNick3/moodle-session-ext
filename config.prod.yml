@@ -1,0 +1,14 @@
+database:
+  path: "sessions.db"
+moodle:
+  base_url: "https://moodle.innopolis.university/"
+  rpm: 120
+  max_burst: 120
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36"
+updater:
+  gap: "30m"
+server:
+  endpoints:
+    - "0.0.0.0:8080"
+logging:
+  filter: "info,moodle_session_ext=trace"

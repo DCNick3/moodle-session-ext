@@ -5,6 +5,15 @@ use serde::{Deserialize, Deserializer};
 use std::net::SocketAddr;
 use std::time::Duration;
 
+#[derive(Debug, Deserialize)]
+pub struct Config {
+    pub database: Database,
+    pub moodle: Moodle,
+    pub updater: Updater,
+    pub server: Server,
+    pub logging: Logging,
+}
+
 fn deserialize_path<'de, D>(de: D) -> Result<Utf8PathBuf, D::Error>
 where
     D: Deserializer<'de>,
@@ -18,7 +27,7 @@ where
     D: Deserializer<'de>,
 {
     let s: &'de str = de::Deserialize::deserialize(de)?;
-    Ok(Url::parse(s).map_err(de::Error::custom)?)
+    Url::parse(s).map_err(de::Error::custom)
 }
 
 #[derive(Debug, Deserialize)]
@@ -38,10 +47,16 @@ pub struct Moodle {
 
 #[derive(Debug, Deserialize)]
 pub struct Updater {
+    #[serde(with = "humantime_serde")]
     pub gap: Duration,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Server {
     pub endpoints: Vec<SocketAddr>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Logging {
+    pub filter: Option<String>,
 }

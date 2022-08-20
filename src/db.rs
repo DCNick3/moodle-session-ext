@@ -211,6 +211,7 @@ impl Database {
         }
     }
 
+    #[allow(unused)]
     pub fn dump(&self) -> Result<String> {
         let mut res = String::new();
 

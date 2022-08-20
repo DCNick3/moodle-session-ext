@@ -5,12 +5,6 @@
     "homepage_url": "https://github.com/DCNick3/moodle-session-ext",
 	"manifest_version": 3,
 	"minimum_chrome_version": "100",
-	"browser_specific_settings": {
-		"gecko": {
-			"id": "moodle-session-ext@dcnick3.me",
-			"strict_min_version": "42.0"
-		}
-	},
 	"icons": {
 		"1024": "../icon.png"
 	},
