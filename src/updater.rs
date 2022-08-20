@@ -40,7 +40,8 @@ pub async fn update_loop(
                     }
                     SessionUpdateResult::SessionDead => {
                         info!("Session died, removing from db");
-                        todo!()
+
+                        db.remove_token(token_id)?;
                     }
                 },
                 Err(e) => {

@@ -4,7 +4,7 @@ use std::fmt::{Debug, Formatter};
 use std::ops::Add;
 use std::time::{Duration, SystemTime};
 
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq)]
 pub struct TokenId([u8; 8]);
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

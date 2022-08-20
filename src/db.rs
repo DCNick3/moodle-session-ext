@@ -163,6 +163,32 @@ impl Database {
         Ok(())
     }
 
+    #[instrument(skip(self))]
+    pub fn remove_token(&self, token_id: TokenId) -> Result<()> {
+        self.users.transaction3(
+            &self.tokens,
+            &self.update_queue,
+            |users, tokens, update_queue| {
+                let token = match tokens.remove(&token_id)? {
+                    Some(v) => v,
+                    None => return Ok(()),
+                };
+
+                let update_queue_key = UpdateQueueKey::from((token.deadline, token_id));
+
+                assert!(update_queue.remove(&update_queue_key)?.is_some());
+
+                let mut user = users.get(&token.owner)?.unwrap();
+                user.tokens.retain(|t| t != &token_id);
+                users.set(&token.owner, &user)?;
+
+                Ok(())
+            },
+        )?;
+
+        Ok(())
+    }
+
     pub fn subscribe_queue_updates(&self) -> Result<kv::Watch<UpdateQueueKey, UpdateQueueItem>> {
         Ok(self.update_queue.watch_prefix(None)?)
     }
