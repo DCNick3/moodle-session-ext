@@ -9,7 +9,6 @@ export async function extend_session(moodle_session) {
 
     console.log("Extending session via", url);
 
-    let result;
     const options = {
         method: 'POST',
         headers: {
@@ -24,7 +23,7 @@ export async function extend_session(moodle_session) {
         console.error(msg);
         throw msg;
     }
-    result = await response.json();
+    let {result} = await response.json();
     console.log("Server replied ", result);
 
     if (!result) {
