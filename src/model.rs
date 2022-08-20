@@ -1,6 +1,7 @@
 use kv::{Error, Raw};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
+use std::ops::Add;
 use std::time::{Duration, SystemTime};
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
@@ -70,19 +71,19 @@ macro_rules! impl_value {
 pub struct UpdateQueueKey([u8; 16]);
 
 impl UpdateQueueKey {
-    pub fn time_left(&self) -> Duration {
-        let (t, _): (Duration, TokenId) = (*self).into();
+    pub fn deadline(&self) -> SystemTime {
+        let (t, _): (SystemTime, TokenId) = (*self).into();
         t
     }
     pub fn token_id(&self) -> TokenId {
-        let (_, k): (Duration, TokenId) = (*self).into();
+        let (_, k): (SystemTime, TokenId) = (*self).into();
         k
     }
 }
 
 impl Debug for UpdateQueueKey {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let (t, k): (Duration, TokenId) = (*self).into();
+        let (t, k): (SystemTime, TokenId) = (*self).into();
 
         f.debug_tuple("UpdateQueueKey").field(&t).field(&k).finish()
     }
@@ -101,9 +102,11 @@ impl<'a> kv::Key<'a> for UpdateQueueKey {
     }
 }
 
-impl From<(Duration, TokenId)> for UpdateQueueKey {
-    fn from((t, id): (Duration, TokenId)) -> Self {
+impl From<(SystemTime, TokenId)> for UpdateQueueKey {
+    fn from((t, id): (SystemTime, TokenId)) -> Self {
         let t: u64 = t
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("Weird time")
             .as_millis()
             .try_into()
             .expect("SystemTime too far into the future");
@@ -116,13 +119,14 @@ impl From<(Duration, TokenId)> for UpdateQueueKey {
     }
 }
 
-impl From<UpdateQueueKey> for (Duration, TokenId) {
+impl From<UpdateQueueKey> for (SystemTime, TokenId) {
     fn from(k: UpdateQueueKey) -> Self {
         let mut time = [0u8; 8];
         time.copy_from_slice(&k.0[..8]);
 
         let time = u64::from_be_bytes(time);
         let time = Duration::from_millis(time);
+        let time = SystemTime::UNIX_EPOCH.add(time);
 
         let mut key = [0u8; 8];
         key.copy_from_slice(&k.0[8..]);
@@ -146,7 +150,7 @@ pub struct Token {
     pub moodle_session: String,
     pub csrf_session: String,
     #[serde(with = "serde_millis")]
-    pub time_left: Duration,
+    pub deadline: SystemTime,
     #[serde(with = "serde_millis")]
     pub added: SystemTime,
 }

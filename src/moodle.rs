@@ -69,6 +69,7 @@ struct AjaxPayload<T> {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct AjaxError {
     pub text: String,
     pub code: String,
@@ -90,6 +91,7 @@ enum AjaxResult<T: Deserialize<'static>> {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct SessionTime {
     userid: u64,
     timeremaining: u64,

@@ -1,9 +1,12 @@
 use crate::db::Database;
 use crate::model::Email;
 use crate::moodle::Moodle;
+use crate::updater::update_loop;
 use anyhow::Result;
 use camino::Utf8PathBuf;
 use reqwest::Url;
+use std::sync::Arc;
+use std::time::Duration;
 use tracing::info;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt;
@@ -13,6 +16,7 @@ pub mod config;
 pub mod db;
 pub mod model;
 pub mod moodle;
+pub mod updater;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
@@ -32,19 +36,19 @@ async fn main() -> Result<()> {
         max_burst: 12,
         user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36".to_string()
     };
+    let updater_config = config::Updater {
+        gap: Duration::from_secs(10790),
+    };
 
     info!("Starting...");
 
-    let db = Database::new(db_config)?;
-    let moodle = Moodle::new(moodle_config)?;
+    let db = Arc::new(Database::new(db_config)?);
+    let moodle = Arc::new(Moodle::new(moodle_config)?);
 
     let email = Email("n.strygin@innopolis.university".to_string());
 
     db.add_token(&email, "REDACTED", "REDACTED")?;
-    db.add_token(&email, "MOODLE2", "")?;
-    db.add_token(&email, "MOODLE2", "")?;
-    db.add_token(&email, "MOODLE3", "")?;
-    db.add_token(&email, "MOODLE4", "")?;
+    db.add_token(&email, "REDACTED", "REDACTED")?;
 
     println!("{:?}", db.get_most_urgent_token()?);
 
@@ -54,6 +58,14 @@ async fn main() -> Result<()> {
     println!("{:?}", moodle.check_session("REDACTED").await?);
 
     println!("{:?}", moodle.update_session("REDACTED", "REDACTED").await?);
+
+    update_loop(
+        db.clone(),
+        moodle.clone(),
+        db.subscribe_queue_updates()?,
+        updater_config,
+    )
+    .await?;
 
     Ok(())
 }

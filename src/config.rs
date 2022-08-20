@@ -2,6 +2,7 @@ use camino::Utf8PathBuf;
 use reqwest::Url;
 use serde::de;
 use serde::{Deserialize, Deserializer};
+use std::time::Duration;
 
 fn deserialize_path<'de, D>(de: D) -> Result<Utf8PathBuf, D::Error>
 where
@@ -32,4 +33,9 @@ pub struct Moodle {
     pub rpm: u32,
     pub max_burst: u32,
     pub user_agent: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Updater {
+    pub gap: Duration,
 }

@@ -84,9 +84,9 @@ impl Database {
                         .0;
                     let rm_token = user.tokens.remove(oldest_index);
 
-                    let time_left = user_tokens[oldest_index].time_left;
+                    let deadline = user_tokens[oldest_index].deadline;
 
-                    let update_queue_key = UpdateQueueKey::from((time_left, rm_token));
+                    let update_queue_key = UpdateQueueKey::from((deadline, rm_token));
 
                     assert!(tokens.remove(&rm_token)?.is_some());
                     assert!(update_queue.remove(&update_queue_key)?.is_some());
@@ -99,16 +99,16 @@ impl Database {
                 user.tokens.push(new_token_id);
 
                 // a lot of time ago...
-                let time_left = Duration::ZERO;
+                let deadline = SystemTime::UNIX_EPOCH;
                 let added = SystemTime::now();
 
-                let update_queue_key = UpdateQueueKey::from((time_left, new_token_id));
+                let update_queue_key = UpdateQueueKey::from((deadline, new_token_id));
 
                 let token = Token {
                     owner: email.clone(),
                     moodle_session: moodle_session.to_string(),
                     csrf_session: csrf_session.to_string(),
-                    time_left,
+                    deadline,
                     added,
                 };
 
@@ -142,10 +142,14 @@ impl Database {
                     }
                     Some(t) => t,
                 };
-                let old_update_key = UpdateQueueKey::from((token.time_left, token_id));
-                let new_update_key = UpdateQueueKey::from((new_time_left, token_id));
 
-                token.time_left = new_time_left;
+                let now = SystemTime::now();
+                let new_deadline = now + new_time_left;
+
+                let old_update_key = UpdateQueueKey::from((token.deadline, token_id));
+                let new_update_key = UpdateQueueKey::from((new_deadline, token_id));
+
+                token.deadline = new_deadline;
 
                 assert!(update_queue.remove(&old_update_key)?.is_some());
                 assert!(update_queue
@@ -157,6 +161,10 @@ impl Database {
             })?;
 
         Ok(())
+    }
+
+    pub fn subscribe_queue_updates(&self) -> Result<kv::Watch<UpdateQueueKey, UpdateQueueItem>> {
+        Ok(self.update_queue.watch_prefix(None)?)
     }
 
     #[instrument(skip(self))]

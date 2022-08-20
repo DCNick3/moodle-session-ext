@@ -531,6 +531,7 @@ name = "kv"
 version = "0.23.1"
 dependencies = [
  "bincode",
+ "pin-project-lite",
  "serde",
  "serde_json",
  "sled",
