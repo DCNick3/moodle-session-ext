@@ -8,7 +8,7 @@
 	"browser_specific_settings": {
 		"gecko": {
 			"id": "moodle-session-ext@dcnick3.me",
-			"strict_min_version": "42.0"
+			"strict_min_version": "100.0"
 		}
 	},
 	"icons": {
