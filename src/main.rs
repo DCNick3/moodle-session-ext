@@ -1,4 +1,5 @@
 use crate::db::Database;
+use crate::model::Email;
 use crate::moodle::Moodle;
 use anyhow::Result;
 use camino::Utf8PathBuf;
@@ -37,15 +38,15 @@ async fn main() -> Result<()> {
     let db = Database::new(db_config)?;
     let moodle = Moodle::new(moodle_config)?;
 
-    // let email = Email("n.strygin@innopolis.university".to_string());
-    //
-    // db.add_token(&email, "MOODLE1".to_string())?;
-    // db.add_token(&email, "MOODLE2".to_string())?;
-    // db.add_token(&email, "MOODLE2".to_string())?;
-    // db.add_token(&email, "MOODLE3".to_string())?;
-    // db.add_token(&email, "MOODLE4".to_string())?;
-    //
-    // println!("{}", db.dump()?);
+    let email = Email("n.strygin@innopolis.university".to_string());
+
+    db.add_token(&email, "MOODLE1".to_string())?;
+    db.add_token(&email, "MOODLE2".to_string())?;
+    db.add_token(&email, "MOODLE2".to_string())?;
+    db.add_token(&email, "MOODLE3".to_string())?;
+    db.add_token(&email, "MOODLE4".to_string())?;
+
+    println!("{}", db.dump()?);
 
     println!("{:?}", moodle.check_session("kekas").await?);
     println!("{:?}", moodle.check_session("SCRUBBED").await?);

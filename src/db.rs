@@ -4,7 +4,7 @@ use anyhow::Result;
 use kv::TransactionError;
 use std::fmt::Write;
 use std::result;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 use tracing::{debug, info, instrument, warn};
 
 pub struct Database {
@@ -84,9 +84,9 @@ impl Database {
                         .0;
                     let rm_token = user.tokens.remove(oldest_index);
 
-                    let last_updated = user_tokens[oldest_index].last_updated;
+                    let time_left = user_tokens[oldest_index].time_left;
 
-                    let update_queue_key = UpdateQueueKey::from((last_updated, rm_token));
+                    let update_queue_key = UpdateQueueKey::from((time_left, rm_token));
 
                     assert!(tokens.remove(&rm_token)?.is_some());
                     assert!(update_queue.remove(&update_queue_key)?.is_some());
@@ -99,16 +99,16 @@ impl Database {
                 user.tokens.push(new_token_id);
 
                 // a lot of time ago...
-                let last_updated = SystemTime::UNIX_EPOCH;
+                let time_left = Duration::ZERO;
                 let added = SystemTime::now();
 
-                let update_queue_key = UpdateQueueKey::from((last_updated, new_token_id));
+                let update_queue_key = UpdateQueueKey::from((time_left, new_token_id));
 
                 let token = Token {
                     owner: email.clone(),
                     moodle_session: moodle_session.clone(),
                     csrf_session: None,
-                    last_updated,
+                    time_left,
                     added,
                 };
 

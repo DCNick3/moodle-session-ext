@@ -1,7 +1,6 @@
 use kv::{Error, Raw};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
-use std::ops::Add;
 use std::time::{Duration, SystemTime};
 
 #[derive(Serialize, Deserialize, Clone, Copy)]
@@ -72,7 +71,7 @@ pub struct UpdateQueueKey([u8; 16]);
 
 impl Debug for UpdateQueueKey {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let (t, k): (SystemTime, TokenId) = (*self).into();
+        let (t, k): (Duration, TokenId) = (*self).into();
 
         f.debug_tuple("UpdateQueueKey").field(&t).field(&k).finish()
     }
@@ -91,11 +90,9 @@ impl<'a> kv::Key<'a> for UpdateQueueKey {
     }
 }
 
-impl From<(SystemTime, TokenId)> for UpdateQueueKey {
-    fn from((t, id): (SystemTime, TokenId)) -> Self {
+impl From<(Duration, TokenId)> for UpdateQueueKey {
+    fn from((t, id): (Duration, TokenId)) -> Self {
         let t: u64 = t
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .expect("SystemTime not representable as UNIX time")
             .as_millis()
             .try_into()
             .expect("SystemTime too far into the future");
@@ -108,13 +105,13 @@ impl From<(SystemTime, TokenId)> for UpdateQueueKey {
     }
 }
 
-impl From<UpdateQueueKey> for (SystemTime, TokenId) {
+impl From<UpdateQueueKey> for (Duration, TokenId) {
     fn from(k: UpdateQueueKey) -> Self {
         let mut time = [0u8; 8];
         time.copy_from_slice(&k.0[..8]);
 
         let time = u64::from_be_bytes(time);
-        let time = SystemTime::UNIX_EPOCH.add(Duration::from_millis(time));
+        let time = Duration::from_millis(time);
 
         let mut key = [0u8; 8];
         key.copy_from_slice(&k.0[8..]);
@@ -138,7 +135,7 @@ pub struct Token {
     pub moodle_session: String,
     pub csrf_session: Option<String>,
     #[serde(with = "serde_millis")]
-    pub last_updated: SystemTime,
+    pub time_left: Duration,
     #[serde(with = "serde_millis")]
     pub added: SystemTime,
 }
