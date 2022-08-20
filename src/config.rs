@@ -2,6 +2,7 @@ use camino::Utf8PathBuf;
 use reqwest::Url;
 use serde::de;
 use serde::{Deserialize, Deserializer};
+use std::net::SocketAddr;
 use std::time::Duration;
 
 fn deserialize_path<'de, D>(de: D) -> Result<Utf8PathBuf, D::Error>
@@ -38,4 +39,9 @@ pub struct Moodle {
 #[derive(Debug, Deserialize)]
 pub struct Updater {
     pub gap: Duration,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Server {
+    pub endpoints: Vec<SocketAddr>,
 }

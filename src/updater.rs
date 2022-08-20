@@ -1,4 +1,4 @@
-use crate::model::{UpdateQueueItem, UpdateQueueKey};
+use crate::model::{Token, TokenId, UpdateQueueItem, UpdateQueueKey};
 use crate::moodle::SessionUpdateResult;
 use crate::{config, Database, Moodle};
 use anyhow::Result;
@@ -7,7 +7,33 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::select;
 use tokio::time::sleep;
-use tracing::{debug, info};
+use tracing::{debug, info, instrument};
+
+#[instrument(skip_all, fields(token_id = ?token_id))]
+async fn update_one(db: &Database, moodle: &Moodle, token_id: TokenId, token: Token) -> Result<()> {
+    info!("Updating session {:?}", token_id);
+
+    match moodle
+        .update_session(&token.moodle_session, &token.csrf_session)
+        .await
+    {
+        Ok(v) => match v {
+            SessionUpdateResult::Ok { time_left } => {
+                db.update_token(token_id, time_left)?;
+            }
+            SessionUpdateResult::SessionDead => {
+                info!("Session died, removing from db");
+
+                db.remove_token(token_id)?;
+            }
+        },
+        Err(e) => {
+            debug!("Session update failed: {}", e);
+        }
+    }
+
+    Ok(())
+}
 
 pub async fn update_loop(
     db: Arc<Database>,
@@ -27,27 +53,7 @@ pub async fn update_loop(
 
         if deadline < now + config.gap {
             let (token_id, token) = token.unwrap();
-
-            info!("Updating session {:?}", token_id);
-
-            match moodle
-                .update_session(&token.moodle_session, &token.csrf_session)
-                .await
-            {
-                Ok(v) => match v {
-                    SessionUpdateResult::Ok { time_left } => {
-                        db.update_token(token_id, time_left)?;
-                    }
-                    SessionUpdateResult::SessionDead => {
-                        info!("Session died, removing from db");
-
-                        db.remove_token(token_id)?;
-                    }
-                },
-                Err(e) => {
-                    debug!("Session update failed: {}", e);
-                }
-            }
+            update_one(&db, &moodle, token_id, token).await?;
         } else {
             info!("Nothing to update it seems")
         }

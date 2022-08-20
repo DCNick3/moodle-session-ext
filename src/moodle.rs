@@ -1,4 +1,4 @@
-use crate::config;
+use crate::{config, Email};
 use anyhow::{anyhow, Context, Result};
 use email_address::EmailAddress;
 use governor::clock::DefaultClock;
@@ -46,7 +46,7 @@ impl ReqwestOtelSpanBackend for TimeTrace {
 #[derive(Debug)]
 pub enum SessionProbeResult {
     Invalid,
-    Valid { email: String, csrf_session: String },
+    Valid { email: Email, csrf_session: String },
 }
 
 #[derive(Debug)]
@@ -176,7 +176,7 @@ impl Moodle {
             .as_str();
 
         Ok(SessionProbeResult::Valid {
-            email: email.to_string(),
+            email: Email(email.to_string()),
             csrf_session: sesskey.to_string(),
         })
     }
