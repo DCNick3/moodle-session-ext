@@ -1,0 +1,9 @@
+version: "3.9"
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.moodle-session-ext.rule=Host(`moodle-session-ext.dcnick3.me`)"
+      - "traefik.http.routers.moodle-session-ext.tls.certresolver=letsencrypt"
