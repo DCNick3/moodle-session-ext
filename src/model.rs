@@ -69,6 +69,17 @@ macro_rules! impl_value {
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct UpdateQueueKey([u8; 16]);
 
+impl UpdateQueueKey {
+    pub fn time_left(&self) -> Duration {
+        let (t, _): (Duration, TokenId) = (*self).into();
+        t
+    }
+    pub fn token_id(&self) -> TokenId {
+        let (_, k): (Duration, TokenId) = (*self).into();
+        k
+    }
+}
+
 impl Debug for UpdateQueueKey {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let (t, k): (Duration, TokenId) = (*self).into();
@@ -133,7 +144,7 @@ impl_value!(User);
 pub struct Token {
     pub owner: Email,
     pub moodle_session: String,
-    pub csrf_session: Option<String>,
+    pub csrf_session: String,
     #[serde(with = "serde_millis")]
     pub time_left: Duration,
     #[serde(with = "serde_millis")]

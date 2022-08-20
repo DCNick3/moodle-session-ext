@@ -12,6 +12,8 @@ use reqwest::{Request, Response, Url};
 use reqwest_tracing::{
     default_on_request_end, reqwest_otel_span, ReqwestOtelSpanBackend, TracingMiddleware,
 };
+use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use std::num::NonZeroU32;
 use std::time::{Duration, Instant};
 use task_local_extensions::Extensions;
@@ -47,10 +49,50 @@ pub enum SessionProbeResult {
     Valid { email: String, csrf_session: String },
 }
 
+#[derive(Debug)]
+pub enum SessionUpdateResult {
+    SessionDead,
+    Ok { time_left: Duration },
+}
+
 pub struct Moodle {
     reqwest: reqwest_middleware::ClientWithMiddleware,
     base_url: Url,
     rate_limiter: RateLimiter<NotKeyed, InMemoryState, DefaultClock>,
+}
+
+#[derive(Serialize)]
+struct AjaxPayload<T> {
+    index: u32,
+    methodname: String,
+    args: T,
+}
+
+#[derive(Debug)]
+struct AjaxError {
+    pub text: String,
+    pub code: String,
+}
+
+impl Display for AjaxError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for AjaxError {}
+
+#[derive(Debug)]
+enum AjaxResult<T: Deserialize<'static>> {
+    Ok(T),
+    SessionDead,
+    Error(AjaxError),
+}
+
+#[derive(Deserialize)]
+struct SessionTime {
+    userid: u64,
+    timeremaining: u64,
 }
 
 impl Moodle {
@@ -135,5 +177,155 @@ impl Moodle {
             email: email.to_string(),
             csrf_session: sesskey.to_string(),
         })
+    }
+
+    async fn ajax<T: Serialize, R: for<'de> Deserialize<'de>>(
+        &self,
+        moodle_session: &str,
+        csrf_session: &str,
+        method_name: &str,
+        args: T,
+    ) -> Result<AjaxResult<R>> {
+        self.rate_limiter.until_ready().await;
+
+        let url = self
+            .base_url
+            .join(&format!("/lib/ajax/service.php?sesskey={}", csrf_session))?;
+
+        let resp = self
+            .reqwest
+            .post(url)
+            .header(
+                COOKIE,
+                HeaderValue::from_str(&format!("MoodleSession={}", moodle_session))?,
+            )
+            .json(&[AjaxPayload::<T> {
+                index: 0,
+                methodname: method_name.to_string(),
+                args,
+            }])
+            .send()
+            .await?;
+
+        let resp = resp.text().await.context("Reading body as string")?;
+
+        let resp: [serde_json::Map<String, serde_json::Value>; 1] =
+            serde_json::from_str(&resp).context("Parsing body as untyped JSON")?;
+        let [resp] = resp;
+        let error = resp
+            .get("error")
+            .ok_or_else(|| anyhow!("Missing \"error\" field in response"))?;
+        if let Some(err) = error.as_str() {
+            let errcode = resp
+                .get("errorcode")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow!("Missing \"errorcode\" field in response or wrong type"))?;
+            return Ok(AjaxResult::Error(AjaxError {
+                text: err.to_string(),
+                code: errcode.to_string(),
+            }));
+        } else if let Some(true) = error.as_bool() {
+            let exception = resp
+                .get("exception")
+                .and_then(|v| v.as_object())
+                .ok_or_else(|| anyhow!("Missing \"exception\" field in response or wrong type"))?;
+            let message = exception
+                .get("message")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow!("Missing \"message\" field in exception or wrong type"))?;
+            let errorcode = exception
+                .get("errorcode")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow!("Missing \"errorcode\" field in exception or wrong type"))?;
+
+            if errorcode == "servicerequireslogin" {
+                return Ok(AjaxResult::SessionDead);
+            }
+
+            return Ok(AjaxResult::Error(AjaxError {
+                text: message.to_string(),
+                code: errorcode.to_string(),
+            }));
+        }
+
+        let data = resp
+            .get("data")
+            .ok_or_else(|| anyhow!("Missing \"data\" field in response"))?;
+
+        Ok(AjaxResult::Ok(
+            serde_json::from_value(data.clone())
+                .context("Parsing response \"data\" field as typed result")?,
+        ))
+    }
+
+    async fn touch_session(&self, moodle_session: &str, csrf_session: &str) -> Result<bool> {
+        Ok(
+            match self
+                .ajax::<_, bool>(
+                    moodle_session,
+                    csrf_session,
+                    "core_session_touch",
+                    serde_json::Map::<String, serde_json::Value>::new(),
+                )
+                .await
+                .context("touch_session")?
+            {
+                AjaxResult::Ok(v) => {
+                    if !v {
+                        return Err(anyhow!("`core_session_touch` returned false?????"));
+                    }
+                    true
+                }
+                AjaxResult::SessionDead => false,
+                AjaxResult::Error(e) => return Err(e).context("core_session_touch"),
+            },
+        )
+    }
+
+    async fn remaining_session_time(
+        &self,
+        moodle_session: &str,
+        csrf_session: &str,
+    ) -> Result<Option<SessionTime>> {
+        Ok(
+            match self
+                .ajax::<_, SessionTime>(
+                    moodle_session,
+                    csrf_session,
+                    "core_session_time_remaining",
+                    serde_json::Map::<String, serde_json::Value>::new(),
+                )
+                .await
+                .context("remaining_session_time")?
+            {
+                AjaxResult::Ok(v) => Some(v),
+                AjaxResult::SessionDead => None,
+                AjaxResult::Error(e) => return Err(e).context("core_session_time_remaining"),
+            },
+        )
+    }
+
+    #[instrument(skip_all)]
+    pub async fn update_session(
+        &self,
+        moodle_session: &str,
+        csrf_session: &str,
+    ) -> Result<SessionUpdateResult> {
+        let touch_result = self
+            .touch_session(moodle_session, csrf_session)
+            .await
+            .context("update_session")?;
+        let remaining_time = self
+            .remaining_session_time(moodle_session, csrf_session)
+            .await
+            .context("update_session")?;
+        if touch_result {
+            if let Some(time) = remaining_time {
+                return Ok(SessionUpdateResult::Ok {
+                    time_left: Duration::from_secs(time.timeremaining),
+                });
+            }
+        }
+        Ok(SessionUpdateResult::SessionDead)
     }
 }

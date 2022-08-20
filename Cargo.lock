@@ -653,6 +653,7 @@ dependencies = [
  "reqwest-middleware",
  "reqwest-tracing",
  "serde",
+ "serde_json",
  "serde_millis",
  "task-local-extensions",
  "tokio",

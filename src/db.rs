@@ -8,7 +8,7 @@ use std::time::{Duration, SystemTime};
 use tracing::{debug, info, instrument, warn};
 
 pub struct Database {
-    db: kv::Store,
+    _db: kv::Store,
     users: kv::Bucket<'static, Email, User>,
     tokens: kv::Bucket<'static, TokenId, Token>,
     update_queue: kv::Bucket<'static, UpdateQueueKey, UpdateQueueItem>,
@@ -23,7 +23,7 @@ impl Database {
         let update_queue = db.bucket(Some("update_queue"))?;
 
         Ok(Self {
-            db,
+            _db: db,
             users,
             tokens,
             update_queue,
@@ -31,7 +31,7 @@ impl Database {
     }
 
     #[instrument(skip(self))]
-    pub fn add_token(&self, email: &Email, moodle_session: String) -> Result<()> {
+    pub fn add_token(&self, email: &Email, moodle_session: &str, csrf_session: &str) -> Result<()> {
         self.users.transaction3(
             &self.tokens,
             &self.update_queue,
@@ -106,8 +106,8 @@ impl Database {
 
                 let token = Token {
                     owner: email.clone(),
-                    moodle_session: moodle_session.clone(),
-                    csrf_session: None,
+                    moodle_session: moodle_session.to_string(),
+                    csrf_session: csrf_session.to_string(),
                     time_left,
                     added,
                 };
@@ -128,6 +128,53 @@ impl Database {
         )?;
 
         Ok(())
+    }
+
+    #[instrument(skip(self))]
+    pub fn update_token(&self, token_id: TokenId, new_time_left: Duration) -> Result<()> {
+        self.tokens
+            .transaction2(&self.update_queue, |tokens, update_queue| {
+                let mut token = match tokens.get(&token_id)? {
+                    None => {
+                        // token was removed while we were fiddling with it seems. This is ok, we just ignore it
+                        info!("{:?} was removed while it was being updated", token_id);
+                        return Ok(());
+                    }
+                    Some(t) => t,
+                };
+                let old_update_key = UpdateQueueKey::from((token.time_left, token_id));
+                let new_update_key = UpdateQueueKey::from((new_time_left, token_id));
+
+                token.time_left = new_time_left;
+
+                assert!(update_queue.remove(&old_update_key)?.is_some());
+                assert!(update_queue
+                    .set(&new_update_key, &UpdateQueueItem { token: token_id })?
+                    .is_none());
+                tokens.set(&token_id, &token)?;
+
+                Ok(())
+            })?;
+
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    pub fn get_most_urgent_token(&self) -> Result<Option<(TokenId, Token)>> {
+        loop {
+            let token_id = match self.update_queue.first()? {
+                None => return Ok(None),
+                Some(v) => v.key::<UpdateQueueKey>()?.token_id(),
+            };
+
+            match self.tokens.get(&token_id)? {
+                // race happened
+                None => continue,
+                Some(token) => {
+                    return Ok(Some((token_id, token)));
+                }
+            }
+        }
     }
 
     pub fn dump(&self) -> Result<String> {

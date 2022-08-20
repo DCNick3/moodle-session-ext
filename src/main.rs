@@ -40,16 +40,20 @@ async fn main() -> Result<()> {
 
     let email = Email("n.strygin@innopolis.university".to_string());
 
-    db.add_token(&email, "MOODLE1".to_string())?;
-    db.add_token(&email, "MOODLE2".to_string())?;
-    db.add_token(&email, "MOODLE2".to_string())?;
-    db.add_token(&email, "MOODLE3".to_string())?;
-    db.add_token(&email, "MOODLE4".to_string())?;
+    db.add_token(&email, "REDACTED", "REDACTED")?;
+    db.add_token(&email, "MOODLE2", "")?;
+    db.add_token(&email, "MOODLE2", "")?;
+    db.add_token(&email, "MOODLE3", "")?;
+    db.add_token(&email, "MOODLE4", "")?;
+
+    println!("{:?}", db.get_most_urgent_token()?);
 
     println!("{}", db.dump()?);
 
     println!("{:?}", moodle.check_session("kekas").await?);
-    println!("{:?}", moodle.check_session("SCRUBBED").await?);
+    println!("{:?}", moodle.check_session("REDACTED").await?);
+
+    println!("{:?}", moodle.update_session("REDACTED", "REDACTED").await?);
 
     Ok(())
 }
