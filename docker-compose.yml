@@ -7,3 +7,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.moodle-session-ext.rule=Host(`moodle-session-ext.dcnick3.me`)"
       - "traefik.http.routers.moodle-session-ext.tls.certresolver=letsencrypt"
+    volumes:
+      - sessions:/sessions.db
+volumes:
+  sessions:
