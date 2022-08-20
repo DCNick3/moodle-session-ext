@@ -1,0 +1,7 @@
+{
+	"mangle": true,
+	"compress": true,
+	"output": {
+		"indent_level": 2
+	}
+}

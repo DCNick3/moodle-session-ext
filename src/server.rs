@@ -1,5 +1,6 @@
 use crate::moodle::SessionProbeResult;
 use crate::{config, Database, Moodle};
+use actix_cors::Cors;
 use actix_web::{post, web, App, HttpServer, Responder, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -29,8 +30,8 @@ fn wrap_result<T>(result: anyhow::Result<T>) -> Result<T> {
     })
 }
 
-#[post("/extend-token")]
-async fn extend_token(
+#[post("/extend-session")]
+async fn extend_session(
     data: web::Data<Data>,
     request: web::Json<ExtendRequest>,
 ) -> Result<impl Responder> {
@@ -62,10 +63,13 @@ pub async fn run(
     let data = Data { db, moodle };
 
     let mut http = HttpServer::new(move || {
+        let cors = Cors::permissive();
+
         App::new()
             .app_data(web::Data::new(data.clone()))
             .wrap(TracingLogger::default())
-            .service(extend_token)
+            .wrap(cors)
+            .service(extend_session)
     });
     for endpoint in config.endpoints {
         http = http.bind(endpoint)?;
