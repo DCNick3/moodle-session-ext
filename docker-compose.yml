@@ -3,11 +3,18 @@ services:
   web:
     build: .
     restart: unless-stopped
+    environment:
+      HONEYCOMB_API_KEY_FILE: /run/secrets/honeycomb_api_key
+    secrets:
+      - honeycomb_api_key
+    volumes:
+      - sessions:/sessions.db
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.moodle-session-ext.rule=Host(`moodle-session-ext.dcnick3.me`)"
       - "traefik.http.routers.moodle-session-ext.tls.certresolver=letsencrypt"
-    volumes:
-      - sessions:/sessions.db
+secrets:
+  honeycomb_api_key:
+    file: /opt/secrets/honeycomb_api_key.txt
 volumes:
   sessions:

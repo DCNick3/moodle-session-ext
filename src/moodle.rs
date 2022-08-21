@@ -181,6 +181,7 @@ impl Moodle {
         })
     }
 
+    #[instrument(skip_all, fields(name = format!("ajax {}", method_name)))]
     async fn ajax<T: Serialize, R: for<'de> Deserialize<'de>>(
         &self,
         moodle_session: &str,

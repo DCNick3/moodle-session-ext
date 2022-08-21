@@ -25,11 +25,23 @@ pub mod moodle;
 pub mod server;
 pub mod updater;
 
+fn read_homeycomb_key() -> Option<String> {
+    std::env::var("HONEYCOMB_API_KEY")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            std::env::var("HONEYCOMB_API_KEY_FILE")
+                .ok()
+                .and_then(|f| std::fs::read_to_string(f).ok())
+        })
+        .map(|s| s.trim().to_string())
+}
+
 fn init_tracing(env_filter: String) {
     let fmt = tracing_subscriber::fmt::layer().with_span_events(FmtSpan::NEW | FmtSpan::CLOSE);
     let filter = tracing_subscriber::filter::EnvFilter::builder().parse_lossy(env_filter);
 
-    if let Ok(honeycomb_key) = std::env::var("HONEYCOMB_API_KEY") {
+    if let Some(honeycomb_key) = read_homeycomb_key() {
         println!("NOTE: Honeycomb key found");
 
         let tracer = opentelemetry_otlp::new_pipeline()
