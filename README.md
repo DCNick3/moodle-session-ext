@@ -12,7 +12,7 @@ As a convenience feature it also features a browser extension that sends the ses
 
 ## Installation
 
-TODO
+Download extension from [releases](https://github.com/DCNick3/moodle-session-ext/releases/latest) page and install it into your browser
 
 ## Your own server
 
