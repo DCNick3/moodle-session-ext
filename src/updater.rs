@@ -42,6 +42,7 @@ pub async fn update_loop(
     config: config::Updater,
 ) -> Result<()> {
     loop {
+        debug!("Tracking {} tokens", db.get_token_count()?);
         let token = db.get_most_urgent_token()?;
 
         let now = SystemTime::now();

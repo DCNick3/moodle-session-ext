@@ -30,7 +30,7 @@ impl Database {
         })
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all, fields(email))]
     pub fn add_token(&self, email: &Email, moodle_session: &str, csrf_session: &str) -> Result<()> {
         self.users.transaction3(
             &self.tokens,
@@ -94,7 +94,7 @@ impl Database {
 
                 let new_token_id = TokenId::from(users.generate_id()?);
 
-                debug!("Will insert the new token with id = {:?}", new_token_id);
+                info!("Will insert the new token with id = {:?}", new_token_id);
 
                 user.tokens.push(new_token_id);
 
@@ -209,6 +209,10 @@ impl Database {
                 }
             }
         }
+    }
+
+    pub fn get_token_count(&self) -> Result<usize> {
+        Ok(self.tokens.len())
     }
 
     #[allow(unused)]
