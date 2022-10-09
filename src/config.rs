@@ -11,7 +11,6 @@ pub struct Config {
     pub moodle: Moodle,
     pub updater: Updater,
     pub server: Server,
-    pub logging: Logging,
 }
 
 fn deserialize_path<'de, D>(de: D) -> Result<Utf8PathBuf, D::Error>
@@ -54,9 +53,4 @@ pub struct Updater {
 #[derive(Debug, Deserialize)]
 pub struct Server {
     pub endpoints: Vec<SocketAddr>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Logging {
-    pub filter: Option<String>,
 }

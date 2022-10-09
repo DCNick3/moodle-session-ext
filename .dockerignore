@@ -1,3 +1,6 @@
 target
 sessions.db
 webextension
+deployment
+.git
+Dockerfile

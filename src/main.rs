@@ -6,17 +6,18 @@ use crate::updater::update_loop;
 use anyhow::Context;
 use anyhow::Result;
 use camino::Utf8PathBuf;
-use opentelemetry::sdk::Resource;
-use opentelemetry::{sdk, KeyValue};
-use opentelemetry_otlp::WithExportConfig;
-use std::collections::HashMap;
+use opentelemetry::sdk::resource::{EnvResourceDetector, SdkProvidedResourceDetector};
+use opentelemetry::sdk::{trace as sdktrace, Resource};
+use opentelemetry_otlp::{HasExportConfig, WithExportConfig};
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::select;
 use tracing::info;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::Registry;
 
 pub mod config;
 pub mod db;
@@ -25,52 +26,56 @@ pub mod moodle;
 pub mod server;
 pub mod updater;
 
-fn read_homeycomb_key() -> Option<String> {
-    std::env::var("HONEYCOMB_API_KEY")
-        .ok()
-        .filter(|s| !s.is_empty())
-        .or_else(|| {
-            std::env::var("HONEYCOMB_API_KEY_FILE")
-                .ok()
-                .and_then(|f| std::fs::read_to_string(f).ok())
-        })
-        .map(|s| s.trim().to_string())
+fn init_tracer() -> Result<sdktrace::Tracer> {
+    let mut exporter = opentelemetry_otlp::new_exporter().tonic().with_env();
+
+    println!(
+        "Using opentelemetry endpoint {}",
+        exporter.export_config().endpoint
+    );
+
+    // overwrite the service name because k8s service name does not always matches what we want
+    std::env::set_var("OTEL_SERVICE_NAME", env!("CARGO_PKG_NAME"));
+
+    let resource = Resource::from_detectors(
+        Duration::from_secs(0),
+        vec![
+            Box::new(EnvResourceDetector::new()),
+            Box::new(SdkProvidedResourceDetector),
+        ],
+    );
+
+    println!("Using opentelemetry resources {:?}", resource);
+
+    Ok(opentelemetry_otlp::new_pipeline()
+        .tracing()
+        .with_exporter(exporter)
+        .with_trace_config(sdktrace::config().with_resource(resource))
+        .install_batch(opentelemetry::runtime::Tokio)?)
 }
 
-fn init_tracing(env_filter: String) {
-    let fmt = tracing_subscriber::fmt::layer().with_span_events(FmtSpan::NEW | FmtSpan::CLOSE);
-    let filter = tracing_subscriber::filter::EnvFilter::builder().parse_lossy(env_filter);
+fn init_tracing() -> Result<()> {
+    let tracer = init_tracer().context("Setting up the opentelemetry exporter")?;
 
-    if let Some(honeycomb_key) = read_homeycomb_key() {
-        println!("NOTE: Honeycomb key found");
+    let default = "info,moodle_session_ext=trace"
+        .parse()
+        .expect("hard-coded default directive should be valid");
 
-        let tracer = opentelemetry_otlp::new_pipeline()
-            .tracing()
-            .with_trace_config(sdk::trace::Config::default().with_resource(Resource::new([
-                KeyValue::new("service.name", "moodle-session-ext"),
-            ])))
-            .with_exporter(
-                opentelemetry_otlp::new_exporter()
-                    .http()
-                    .with_endpoint("https://api.honeycomb.io/v1/traces")
-                    .with_headers(HashMap::from([(
-                        "x-honeycomb-team".to_string(),
-                        honeycomb_key,
-                    )])),
-            )
-            .install_batch(opentelemetry::runtime::Tokio)
-            // .install_simple()
-            .unwrap();
+    Registry::default()
+        .with(
+            tracing_subscriber::EnvFilter::builder()
+                .with_default_directive(default)
+                .from_env_lossy(),
+        )
+        .with(
+            tracing_subscriber::fmt::Layer::new()
+                .with_span_events(FmtSpan::NEW | FmtSpan::CLOSE)
+                .event_format(tracing_subscriber::fmt::format::Format::default().compact()),
+        )
+        .with(tracing_opentelemetry::layer().with_tracer(tracer))
+        .init();
 
-        tracing_subscriber::registry()
-            .with(filter)
-            .with(fmt)
-            .with(tracing_opentelemetry::OpenTelemetryLayer::new(tracer))
-            .init();
-    } else {
-        println!("NOTE: Honeycomb key NOT found");
-        tracing_subscriber::registry().with(filter).with(fmt).init();
-    };
+    Ok(())
 }
 
 #[tokio::main]
@@ -84,12 +89,7 @@ async fn main() -> Result<()> {
 
     println!("config = {:#?}", config);
 
-    init_tracing(
-        std::env::var("RUST_LOG") // RUST_LOG is top priority
-            .ok()
-            .or(config.logging.filter) // then we read config
-            .unwrap_or_else(|| "".to_string()),
-    );
+    init_tracing()?;
 
     info!("Starting...");
 

@@ -10,5 +10,3 @@ updater:
 server:
   endpoints:
     - "127.0.0.1:8081"
-logging:
-  filter: "info,moodle_session_ext=trace"

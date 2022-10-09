@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: moodle-session-ext
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: moodle-session-ext
+  template:
+    metadata:
+      labels:
+        app: moodle-session-ext
+      annotations:
+        instrumentation.opentelemetry.io/inject-sdk: "true"
+    spec:
+      containers:
+        - name: moodle-session-ext
+          image: ghcr.io/dcnick3/moodle-session-ext
+          volumeMounts:
+            - mountPath: /sessions.db
+              name: task-pv-storage
+      volumes:
+        - name: sessions-storage
+          persistentVolumeClaim:
+            claimName: moodle-session-ext-pvc

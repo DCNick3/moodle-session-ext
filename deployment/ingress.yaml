@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: moodle-session-ext-ingress
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    cert-manager.io/issuer: cf-origin-prod
+    cert-manager.io/issuer-kind: OriginIssuer
+    cert-manager.io/issuer-group: cert-manager.k8s.cloudflare.com
+spec:
+  rules:
+    - host: moodle-session-ext.dcnick3.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: moodle-session-ext
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - moodle-session-ext.dcnick3.me
+      secretName: moodle-session-ext-ingress-secret
