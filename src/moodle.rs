@@ -317,11 +317,11 @@ impl Moodle {
         let touch_result = self
             .touch_session(moodle_session, csrf_session)
             .await
-            .context("update_session")?;
+            .context("Failed to touch session")?;
         let remaining_time = self
             .remaining_session_time(moodle_session, csrf_session)
             .await
-            .context("update_session")?;
+            .context("Failed to determine remaining session time")?;
         if touch_result {
             if let Some(time) = remaining_time {
                 return Ok(SessionUpdateResult::Ok {

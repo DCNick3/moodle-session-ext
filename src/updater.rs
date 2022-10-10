@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::select;
 use tokio::time::sleep;
-use tracing::{debug, info, instrument};
+use tracing::{debug, info, instrument, warn};
 
 #[instrument(skip_all, fields(token_id = ?token_id))]
 async fn update_one(db: &Database, moodle: &Moodle, token_id: TokenId, token: Token) -> Result<()> {
@@ -28,7 +28,7 @@ async fn update_one(db: &Database, moodle: &Moodle, token_id: TokenId, token: To
             }
         },
         Err(e) => {
-            debug!("Session update failed: {}", e);
+            warn!("Session update failed: {:?}", e);
         }
     }
 

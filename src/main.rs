@@ -57,7 +57,7 @@ fn init_tracer() -> Result<sdktrace::Tracer> {
 fn init_tracing() -> Result<()> {
     let tracer = init_tracer().context("Setting up the opentelemetry exporter")?;
 
-    let default = "info,moodle_session_ext=trace"
+    let default = "moodle_session_ext=trace"
         .parse()
         .expect("hard-coded default directive should be valid");
 

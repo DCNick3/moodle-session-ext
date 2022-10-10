@@ -21,6 +21,9 @@ spec:
           volumeMounts:
             - mountPath: /sessions.db
               name: sessions-storage
+          env:
+            - name: RUST_LOG
+              value: "info,moodle_session_ext=trace"
       volumes:
         - name: sessions-storage
           persistentVolumeClaim:
