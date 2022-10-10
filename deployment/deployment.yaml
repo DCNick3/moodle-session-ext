@@ -5,6 +5,7 @@ metadata:
   namespace: default
 spec:
   replicas: 1
+  revisionHistoryLimit: 0 # we use a PVC for the DB, so we can't keep old revisions
   selector:
     matchLabels:
       app: moodle-session-ext
