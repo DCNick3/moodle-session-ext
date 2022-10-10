@@ -20,7 +20,7 @@ spec:
           image: ghcr.io/dcnick3/moodle-session-ext
           volumeMounts:
             - mountPath: /sessions.db
-              name: task-pv-storage
+              name: sessions-storage
       volumes:
         - name: sessions-storage
           persistentVolumeClaim:
