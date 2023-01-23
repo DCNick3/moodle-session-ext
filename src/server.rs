@@ -21,6 +21,7 @@ struct ExtendRequest {
 #[derive(Serialize)]
 struct ExtendResponse {
     pub result: bool,
+    pub email: Option<String>,
 }
 
 fn wrap_result<T>(result: anyhow::Result<T>) -> Result<T> {
@@ -37,10 +38,10 @@ async fn extend_session(
 ) -> Result<impl Responder> {
     let moodle_session = &request.moodle_session;
 
-    let result = match wrap_result(data.moodle.check_session(moodle_session).await)? {
+    let email = match wrap_result(data.moodle.check_session(moodle_session).await)? {
         SessionProbeResult::Invalid => {
             info!("Moodle session {} is invalid", moodle_session);
-            false
+            None
         }
         SessionProbeResult::Valid {
             email,
@@ -48,11 +49,14 @@ async fn extend_session(
         } => {
             info!("Provided token is valid, adding to database");
             wrap_result(data.db.add_token(&email, moodle_session, &csrf_session))?;
-            true
+            Some(email.0)
         }
     };
 
-    Ok(web::Json(ExtendResponse { result }))
+    Ok(web::Json(ExtendResponse {
+        result: email.is_some(),
+        email,
+    }))
 }
 
 pub async fn run(
