@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: moodle-session-ext
-  namespace: default
 spec:
   replicas: 1
   revisionHistoryLimit: 0 # we use a PVC for the DB, so we can't keep old revisions
@@ -18,7 +17,7 @@ spec:
     spec:
       containers:
         - name: moodle-session-ext
-          image: ghcr.io/dcnick3/moodle-session-ext
+          image: docker pull ghcr.io/dcnick3/moodle-session-ext:ref-cefae23f6dc152f5b32eb558ab547985ae7daa98
           volumeMounts:
             - mountPath: /sessions.db
               name: sessions-storage
