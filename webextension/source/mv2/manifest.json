@@ -1,6 +1,6 @@
 {
 	"name": "Moodle Session Extender",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Extend your moodle sessions!",
 	"homepage_url": "https://github.com/DCNick3/moodle-session-ext",
 	"manifest_version": 2,
