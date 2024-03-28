@@ -23,22 +23,22 @@ browser.runtime.onMessage.addListener(async (msg, _sender) => {
             let current_session = storage.session || {};
             console.log("Got current_session:", current_session)
 
-            const moodle_session = await browser.cookies.get({
+            const got_moodle_session = await browser.cookies.get({
                 name: "MoodleSession",
                 url: DOMAIN,
             })
-            moodle_session.url = DOMAIN;
-            delete moodle_session.hostOnly;
-            delete moodle_session.session;
-            console.log("Got moodle_session:", moodle_session)
 
-            console.log(current_session.session, moodle_session.value);
-            if (current_session.session !== moodle_session.value) {
+            console.log("Got moodle_session:", got_moodle_session)
+
+            const session = got_moodle_session.value;
+
+            console.log(current_session.session, session);
+            if (current_session.session !== session) {
                 console.log("Stored session differs, sending the new one to the server!");
 
                 let ok = false;
                 try {
-                    await extend_session(moodle_session.value);
+                    await extend_session(session);
                     ok = true;
                 } catch (e) {
                     console.error(e)
@@ -51,13 +51,19 @@ browser.runtime.onMessage.addListener(async (msg, _sender) => {
                 }
         
                 if (ok) {
-                    current_session.session = moodle_session.value;
+                    current_session.session = session;
 
                     console.log("All good, saving...");
 
-                    // set expiration time 10 years from now
-                    moodle_session.expirationDate = (new Date().valueOf() / 1000)|0 + 60 * 60 * 24 * 365 * 10;
-                    await browser.cookies.set(moodle_session);
+                    // get and set APIs for cookies have different semantics
+                    // so we re-build the object to be sure it's good
+                    await browser.cookies.set({
+                        name: "MoodleSession",
+                        url: DOMAIN,
+                        // 10 years from now
+                        expirationDate: (new Date().valueOf() / 1000)|0 + 60 * 60 * 24 * 365 * 10,
+                        value: session,
+                    });
                     await browser.storage.local.set({session: current_session})
                     await browser.notifications.create({
                         type: "basic",
